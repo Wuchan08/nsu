@@ -261,16 +261,43 @@ class EDA:
             st.subheader("중복 행 개수")
             st.write(f"{df.duplicated().sum():,} rows")
 
-        # --- Tab 2: 연도별 추이 ---
+
+        # --- Tab 2: 연도별 추이 + 예측 ---
         with tabs[1]:
-            st.header("연도별 전체 인구 추이")
+            st.header("연도별 전체 인구 추이 및 2035 예측")
+
+            # 'National' 데이터 준비
             national = df[df['region_en'] == 'National'].sort_values('연도')
+            years = national['연도'].values
+            pops = national['인구'].values
+
+            # 최근 3년 출생-사망 순변화 평균 계산
+            recent = national.tail(3)
+            net_changes = recent['출생아수(명)'] - recent['사망자수(명)']
+            avg_net = net_changes.mean()
+
+            last_year = int(recent['연도'].iloc[-1])
+            last_pop = float(recent['인구'].iloc[-1])
+
+            # 2035년까지 예측 연도 및 값
+            pred_years = np.arange(last_year + 1, 2036)
+            pred_pops = last_pop + avg_net * (pred_years - last_year)
+
+            # 그래프 그리기
             fig, ax = plt.subplots()
-            ax.plot(national['연도'], national['인구'], marker='o')
+            ax.plot(years, pops, marker='o', label='Actual')
+            ax.plot(pred_years, pred_pops, marker='x', linestyle='--', color='gray', label='Predicted')
+            # 2035 예측 점 강조
+            pop2035 = last_pop + avg_net * (2035 - last_year)
+            ax.scatter(2035, pop2035, s=50, color='red')
+            ax.text(2035, pop2035, f"{int(pop2035):,}", va='bottom', ha='right')
+
             ax.set_xlabel("Year")
             ax.set_ylabel("Population")
-            ax.set_title("Yearly Total Population")
+            ax.set_title("Yearly National Population with 2035 Forecast")
+            ax.legend()
             st.pyplot(fig)
+
 
         # --- Tab 3: 지역별 분석 ---
         with tabs[2]:
