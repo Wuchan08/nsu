@@ -347,23 +347,38 @@ class EDA:
             st.write("This chart ranks regions by percentage growth (or decline) over the last 5 years.")
 
         # --- Tab 4: 변화량 분석 ---
+# --- Tab 4: 변화량 분석 (절댓값 기준 상위 100 사례) ---
         with tabs[3]:
-            st.header("연도별 인구 증감 상위 100 사례")
-            df_diff = df[df['region_en'] != 'National'].copy()
-            df_diff = df_diff.sort_values(['region_en','연도'])
-            df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
-            df_top = df_diff.nlargest(100, 'diff')[['region_en','연도','diff']].dropna()
+            st.header("Top 100 Yearly Population Differences (by Absolute Change)")
 
-            # 양수·음수에 따른 컬러 함수
+            # 전국 제외, 연도별 diff 계산
+            df_diff = df[df['region_en'] != 'National'].copy()
+            df_diff = df_diff.sort_values(['region_en', '연도'])
+            df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
+
+            # 절댓값 기준 상위 100개 추출
+            df_diff['abs_diff'] = df_diff['diff'].abs()
+            top100 = (
+                df_diff
+                .nlargest(100, 'abs_diff')[['region_en', '연도', 'diff']]
+                .dropna()
+                .reset_index(drop=True)
+            )
+
+            # 컬러 함수: 양수 파랑, 음수 빨강
             def color_diff(val):
                 return 'background-color: #3182bd' if val >= 0 else 'background-color: #de2d26'
 
+            # 스타일 적용
             styled = (
-                df_top.style
-                      .applymap(color_diff, subset=['diff'])
-                      .format({'diff': '{:,.0f}'})
+                top100.style
+                    .applymap(color_diff, subset=['diff'])
+                    .format({'diff': '{:,.0f}'})
+                    .set_caption("Sorted by |diff| descending")
             )
+
             st.dataframe(styled)
+
 
         # --- Tab 5: 시각화 ---
         with tabs[4]:
