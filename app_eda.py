@@ -207,13 +207,6 @@ class Logout:
 
 
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import io
-
 class EDA:
     def __init__(self):
         st.title("Population Trends EDA")
@@ -224,18 +217,23 @@ class EDA:
             st.info("Please upload the population_trends.csv file.")
             return
 
-        # 2) 데이터 로드 및 전처리
-        df = pd.read_csv(uploaded)
-        # '-' 문자열을 NaN으로 변환
+        # 2) 데이터 로드 및 결측 처리
+        df = pd.read_csv(uploaded)  
+        # '-' 문자열을 일단 NaN으로 간주
         df.replace('-', np.nan, inplace=True)
-        # 세종 지역만 NaN → 0
+
+        # ‘세종’ 지역에 한해 모든 NaN → 0
         mask_sejong = df['지역'] == '세종'
         df.loc[mask_sejong] = df.loc[mask_sejong].fillna(0)
-        # 연도, 인구, 출생, 사망 숫자형 변환
+
+        # 3) 열 타입 정리
+        # 연도 정수화
         df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
+        # 주요 수치형 열 숫자 변환
         for col in ['인구', '출생아수(명)', '사망자수(명)']:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-        # 한글→영문 지역명 매핑
+
+        # 4) 한글→영문 지역명 매핑
         mapping = {
             '전국':'National','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
             '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong',
@@ -244,7 +242,7 @@ class EDA:
         }
         df['region_en'] = df['지역'].map(mapping)
 
-        # 3) 탭 생성
+        # 5) 탭 생성
         tabs = st.tabs([
             "🔢 기초 통계",
             "📈 연도별 추이",
@@ -253,7 +251,18 @@ class EDA:
             "🎨 시각화"
         ])
 
-        # --- Tab 1: 기초 통계 (unchanged) ---
+        # --- Tab 1: 기초 통계 ---
+        with tabs[0]:
+            st.header("기초 통계")
+            st.subheader("요약 통계")
+            st.write(df.describe(include='all'))
+            st.subheader("결측치 개수")
+            st.write(df.isnull().sum())
+            st.subheader("중복 행 개수")
+            st.write(f"{df.duplicated().sum():,} rows")
+
+        # --- Tab 2: 연도별 추이 ---
+       # --- Tab 1: 기초 통계 (unchanged) ---
         with tabs[0]:
             st.header("기초 통계")
             st.subheader("요약 통계")
@@ -299,8 +308,58 @@ class EDA:
             ax.legend()
             st.pyplot(fig)
 
-        # --- Tab 3, 4, 5: (unchanged) ---
-        # ... (기존에 작성된 지역별 분석, 변화량 분석, 시각화 코드)
+        # --- Tab 3: 지역별 분석 ---
+        with tabs[2]:
+            st.header("지역별 5년 인구 변화량 (내림차순)")
+            last = int(df['연도'].max())
+            first = last - 5
+            df5 = df[df['연도'].isin([first, last])]
+            piv = df5.pivot_table(index='region_en', columns='연도', values='인구')
+            piv = piv.drop('National', errors='ignore').dropna()
+            piv['change'] = piv[last] - piv[first]
+            piv = piv.sort_values('change', ascending=False)
+
+            fig, ax = plt.subplots()
+            sns.barplot(x=piv['change']/1000, y=piv.index, ax=ax)
+            for i, v in enumerate(piv['change']/1000):
+                ax.text(v, i, f"{v:.1f}", va='center')
+            ax.set_xlabel("Change (Thousands)")
+            st.pyplot(fig)
+
+        # --- Tab 4: 변화량 분석 ---
+        with tabs[3]:
+            st.header("연도별 인구 증감 상위 100 사례")
+            df_diff = df[df['region_en'] != 'National'].copy()
+            df_diff = df_diff.sort_values(['region_en','연도'])
+            df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
+            df_top = df_diff.nlargest(100, 'diff')[['region_en','연도','diff']].dropna()
+
+            # 양수·음수에 따른 컬러 함수
+            def color_diff(val):
+                return 'background-color: #3182bd' if val >= 0 else 'background-color: #de2d26'
+
+            styled = (
+                df_top.style
+                      .applymap(color_diff, subset=['diff'])
+                      .format({'diff': '{:,.0f}'})
+            )
+            st.dataframe(styled)
+
+        # --- Tab 5: 시각화 ---
+        with tabs[4]:
+            st.header("누적 영역 그래프 (Region × Year)")
+            pivot = df.pivot_table(
+                index='연도', columns='region_en', values='인구'
+            ).fillna(0)
+
+            colors = sns.color_palette('tab20', n_colors=len(pivot.columns))
+            fig, ax = plt.subplots(figsize=(10,6))
+            pivot.plot.area(ax=ax, color=colors)
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Population")
+            ax.set_title("Stacked Area Chart by Region")
+            ax.legend(loc='upper left', bbox_to_anchor=(1.0,1.0))
+            st.pyplot(fig)
 
 # ---------------------
 # 페이지 객체 생성
