@@ -300,6 +300,7 @@ class EDA:
     
 
         # --- Tab 3: 지역별 분석 ---
+# --- Tab 3: 지역별 5년 인구 변화량 & 변화율 (수정) ---
         with tabs[2]:
             st.header("Regional 5-Year Population Changes")
 
@@ -312,51 +313,39 @@ class EDA:
             }
             df['region_en'] = df['지역'].map(mapping)
 
-            # 2) 최근 5년 구간 계산
+            # 2) 최근 5년 범위
             last_year = int(df['연도'].max())
             first_year = last_year - 5
             df5 = df[df['연도'].isin([first_year, last_year])]
 
-            # 3) 절대 변화량
+            # 3) 피벗 테이블 생성
             piv = df5.pivot_table(index='region_en', columns='연도', values='인구')
             piv = piv.drop('National', errors='ignore').dropna()
             piv['change'] = piv[last_year] - piv[first_year]
-            piv = piv.sort_values('change', ascending=False)
-
-            # 4) 수평 막대 — 절대 변화량 (단위: 천명)
-            fig1, ax1 = plt.subplots()
-            sns.barplot(x=piv['change'] / 1000,
-                        y=piv.index,
-                        ax=ax1)
-            for i, v in enumerate(piv['change'] / 1000):
-                ax1.text(v, i, f"{v:.1f}", va='center')
-            ax1.set_xlabel("Change (Thousands)")
-            ax1.set_ylabel("")              # no Korean
-            ax1.set_title("5-Year Absolute Change by Region")
-            st.pyplot(fig1)
-            st.write(
-                "This chart ranks regions (excluding National) by absolute "
-                "population change over the last 5 years."
-            )
-
-            # 5) 변화율 계산
             piv['rate'] = piv['change'] / piv[first_year] * 100
 
-            # 6) 수평 막대 — 변화율 (%)
+            # 4) 절대 변화량 그래프
+            fig1, ax1 = plt.subplots()
+            piv_abs = piv.sort_values('change', ascending=False)
+            sns.barplot(x=piv_abs['change'] / 1000, y=piv_abs.index, ax=ax1)
+            for i, v in enumerate(piv_abs['change'] / 1000):
+                ax1.text(v, i, f"{v:.1f}", va='center')
+            ax1.set_xlabel("Change (Thousands)")
+            ax1.set_title("5-Year Absolute Change by Region")
+            st.pyplot(fig1)
+            st.write("This chart ranks regions by absolute population change over the last 5 years.")
+
+            # 5) 변화율 그래프 (내림차순 정렬)
             fig2, ax2 = plt.subplots()
-            sns.barplot(x=piv['rate'],
-                        y=piv.index,
-                        ax=ax2)
-            for i, v in enumerate(piv['rate']):
+            piv_rate = piv.sort_values('rate', ascending=False)   # <-- here we sort by rate descending
+            sns.barplot(x=piv_rate['rate'], y=piv_rate.index, ax=ax2)
+            for i, v in enumerate(piv_rate['rate']):
                 ax2.text(v, i, f"{v:.1f}%", va='center')
             ax2.set_xlabel("Growth Rate (%)")
-            ax2.set_ylabel("")
             ax2.set_title("5-Year Growth Rate by Region")
             st.pyplot(fig2)
-            st.write(
-                "This chart shows the percentage growth (or decline) of each region’s "
-                "population relative to five years ago."
-            )
+            st.write("This chart ranks regions by percentage growth (or decline) over the last 5 years.")
+
         # --- Tab 4: 변화량 분석 ---
         with tabs[3]:
             st.header("연도별 인구 증감 상위 100 사례")
