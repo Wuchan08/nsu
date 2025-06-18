@@ -297,19 +297,20 @@ class EDA:
             ax.set_title("Yearly National Population with 2035 Forecast")
             ax.legend()
             st.pyplot(fig)
-            
 
 
-        # --- Tab 3: 지역별 분석 ---
+
+     # --- Tab 3: 지역별 분석 ---
         with tabs[2]:
-            st.header("지역별 5년 인구 변화량 (내림차순)")
+            st.header("지역별 5년 인구 변화량 (절대값 기준 내림차순)")
             last = int(df['연도'].max())
             first = last - 5
             df5 = df[df['연도'].isin([first, last])]
             piv = df5.pivot_table(index='region_en', columns='연도', values='인구')
             piv = piv.drop('National', errors='ignore').dropna()
             piv['change'] = piv[last] - piv[first]
-            piv = piv.sort_values('change', ascending=False)
+            piv['abs_change'] = piv['change'].abs()
+            piv = piv.sort_values('abs_change', ascending=False)
 
             fig, ax = plt.subplots()
             sns.barplot(x=piv['change']/1000, y=piv.index, ax=ax)
@@ -317,6 +318,7 @@ class EDA:
                 ax.text(v, i, f"{v:.1f}", va='center')
             ax.set_xlabel("Change (Thousands)")
             st.pyplot(fig)
+            st.write("This chart is sorted by absolute 5-year change, showing positive and negative shifts prominently.")
 
         # --- Tab 4: 변화량 분석 ---
         with tabs[3]:
