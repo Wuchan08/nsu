@@ -203,6 +203,8 @@ class Logout:
 
 
 
+
+
 class EDA:
     def __init__(self):
         st.title("Population Trends EDA")
@@ -224,7 +226,7 @@ class EDA:
         #  - 연도 정수 변환
         df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
 
-        # 한글 지역명 → 영문 매핑
+        # 3) 한글→영문 지역명 매핑
         mapping = {
             '전국':'National','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
             '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong',
@@ -233,7 +235,7 @@ class EDA:
         }
         df['region_en'] = df['지역'].map(mapping)
 
-        # 3) 탭 생성
+        # 4) 탭 생성
         tabs = st.tabs([
             "🔢 기초 통계",
             "📈 연도별 추이",
@@ -255,7 +257,7 @@ class EDA:
         # --- Tab 2: 연도별 추이 ---
         with tabs[1]:
             st.header("연도별 전체 인구 추이")
-            national = df[df['지역'] == '전국'].sort_values('연도')
+            national = df[df['region_en'] == 'National'].sort_values('연도')
             fig, ax = plt.subplots()
             ax.plot(national['연도'], national['인구'], marker='o')
             ax.set_xlabel("Year")
@@ -284,19 +286,20 @@ class EDA:
         # --- Tab 4: 변화량 분석 ---
         with tabs[3]:
             st.header("연도별 인구 증감 상위 100 사례")
-            df_diff = df[df['지역'] != '전국'].copy()
+            df_diff = df[df['region_en'] != 'National'].copy()
             df_diff = df_diff.sort_values(['region_en','연도'])
             df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
             df_top = df_diff.nlargest(100, 'diff')[['region_en','연도','diff']].dropna()
 
-            # 배경색 함수 정의
+            # 양수(파랑), 음수(빨강) 배경색 함수
             def color_diff(val):
-                return 'background-color: #3182bd' if val >= 0 else 'background-color: #de2d26'
+                color = '#3182bd' if val >= 0 else '#de2d26'
+                return f'background-color: {color}'
 
             styled = (
                 df_top.style
-                      .applymap(color_diff, subset=['diff'])  # 양수: 파랑, 음수: 빨강
-                      .format({'diff': '{:,.0f}'})            # 천단위 콤마 포맷
+                      .applymap(color_diff, subset=['diff'])
+                      .format({'diff': '{:,.0f}'})
             )
             st.dataframe(styled)
 
