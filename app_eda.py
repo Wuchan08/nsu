@@ -297,6 +297,7 @@ class EDA:
             ax.set_title("Yearly National Population with 2035 Forecast")
             ax.legend()
             st.pyplot(fig)
+            
 
 
         # --- Tab 3: 지역별 분석 ---
