@@ -205,6 +205,8 @@ class Logout:
 
 
 
+
+
 class EDA:
     def __init__(self):
         st.title("Population Trends EDA")
@@ -214,19 +216,24 @@ class EDA:
         if not uploaded:
             st.info("Please upload the population_trends.csv file.")
             return
-        df = pd.read_csv(uploaded, dtype=str)
 
-        # 2) 전처리
-        #  - ‘세종’ 지역의 '-' → 0
+        # 2) 데이터 로드 및 결측 처리
+        df = pd.read_csv(uploaded)  
+        # '-' 문자열을 일단 NaN으로 간주
+        df.replace('-', np.nan, inplace=True)
+
+        # ‘세종’ 지역에 한해 모든 NaN → 0
         mask_sejong = df['지역'] == '세종'
-        df.loc[mask_sejong] = df.loc[mask_sejong].replace('-', '0')
-        #  - 숫자형 변환
+        df.loc[mask_sejong] = df.loc[mask_sejong].fillna(0)
+
+        # 3) 열 타입 정리
+        # 연도 정수화
+        df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
+        # 주요 수치형 열 숫자 변환
         for col in ['인구', '출생아수(명)', '사망자수(명)']:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-        #  - 연도 정수 변환
-        df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
 
-        # 3) 한글→영문 지역명 매핑
+        # 4) 한글→영문 지역명 매핑
         mapping = {
             '전국':'National','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
             '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong',
@@ -235,7 +242,7 @@ class EDA:
         }
         df['region_en'] = df['지역'].map(mapping)
 
-        # 4) 탭 생성
+        # 5) 탭 생성
         tabs = st.tabs([
             "🔢 기초 통계",
             "📈 연도별 추이",
@@ -291,10 +298,9 @@ class EDA:
             df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
             df_top = df_diff.nlargest(100, 'diff')[['region_en','연도','diff']].dropna()
 
-            # 양수(파랑), 음수(빨강) 배경색 함수
+            # 양수·음수에 따른 컬러 함수
             def color_diff(val):
-                color = '#3182bd' if val >= 0 else '#de2d26'
-                return f'background-color: {color}'
+                return 'background-color: #3182bd' if val >= 0 else 'background-color: #de2d26'
 
             styled = (
                 df_top.style
@@ -318,7 +324,6 @@ class EDA:
             ax.set_title("Stacked Area Chart by Region")
             ax.legend(loc='upper left', bbox_to_anchor=(1.0,1.0))
             st.pyplot(fig)
-
 
 # ---------------------
 # 페이지 객체 생성
