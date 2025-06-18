@@ -1,0 +1,5 @@
+streamlit
+seaborn
+matplotlib
+pyrebase4
+setuptools
