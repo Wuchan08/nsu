@@ -202,11 +202,12 @@ class Logout:
 # ---------------------
 
 
+
 class EDA:
     def __init__(self):
         st.title("Population Trends EDA")
 
-        # 1) 파일 업로드
+        # 1) CSV 파일 업로드
         uploaded = st.file_uploader("Upload population_trends.csv", type="csv")
         if not uploaded:
             st.info("Please upload the population_trends.csv file.")
@@ -214,14 +215,23 @@ class EDA:
         df = pd.read_csv(uploaded, dtype=str)
 
         # 2) 전처리
-        #  - '세종' 지역의 '-' → 0
+        #  - ‘세종’ 지역의 '-' → 0
         mask_sejong = df['지역'] == '세종'
         df.loc[mask_sejong] = df.loc[mask_sejong].replace('-', '0')
         #  - 숫자형 변환
         for col in ['인구', '출생아수(명)', '사망자수(명)']:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-        #  - 연도 열을 정수로
+        #  - 연도 정수 변환
         df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
+
+        # 한글 지역명 → 영문 매핑
+        mapping = {
+            '전국':'National','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
+            '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong',
+            '경기':'Gyeonggi','강원':'Gangwon','충북':'Chungbuk','충남':'Chungnam',
+            '전북':'Jeonbuk','전남':'Jeonnam','경북':'Gyeongbuk','경남':'Gyeongnam','제주':'Jeju'
+        }
+        df['region_en'] = df['지역'].map(mapping)
 
         # 3) 탭 생성
         tabs = st.tabs([
@@ -256,15 +266,14 @@ class EDA:
         # --- Tab 3: 지역별 분석 ---
         with tabs[2]:
             st.header("지역별 5년 인구 변화량 (내림차순)")
-            last = df['연도'].max()
+            last = int(df['연도'].max())
             first = last - 5
             df5 = df[df['연도'].isin([first, last])]
-            piv = df5.pivot_table(index='지역', columns='연도', values='인구')
-            piv = piv.drop('전국', errors='ignore').dropna()
+            piv = df5.pivot_table(index='region_en', columns='연도', values='인구')
+            piv = piv.drop('National', errors='ignore').dropna()
             piv['change'] = piv[last] - piv[first]
             piv = piv.sort_values('change', ascending=False)
 
-            # 막대그래프 (수평, 단위: 천명)
             fig, ax = plt.subplots()
             sns.barplot(x=piv['change']/1000, y=piv.index, ax=ax)
             for i, v in enumerate(piv['change']/1000):
@@ -276,29 +285,28 @@ class EDA:
         with tabs[3]:
             st.header("연도별 인구 증감 상위 100 사례")
             df_diff = df[df['지역'] != '전국'].copy()
-            df_diff = df_diff.sort_values(['지역','연도'])
-            df_diff['diff'] = df_diff.groupby('지역')['인구'].diff()
-            top100 = df_diff.nlargest(100, 'diff')[['지역','연도','diff']].dropna()
-            # 천단위 콤마
-            top100['diff'] = top100['diff'].map(lambda x: f"{int(x):,}")
-            st.dataframe(top100.style
-                         .bar(subset=['diff'], 
-                              color=['#de2d26','#3182bd']) )
+            df_diff = df_diff.sort_values(['region_en','연도'])
+            df_diff['diff'] = df_diff.groupby('region_en')['인구'].diff()
+            df_top = df_diff.nlargest(100, 'diff')[['region_en','연도','diff']].dropna()
+
+            # 배경색 함수 정의
+            def color_diff(val):
+                return 'background-color: #3182bd' if val >= 0 else 'background-color: #de2d26'
+
+            styled = (
+                df_top.style
+                      .applymap(color_diff, subset=['diff'])  # 양수: 파랑, 음수: 빨강
+                      .format({'diff': '{:,.0f}'})            # 천단위 콤마 포맷
+            )
+            st.dataframe(styled)
 
         # --- Tab 5: 시각화 ---
         with tabs[4]:
             st.header("누적 영역 그래프 (Region × Year)")
-            # 영어 지역명 매핑
-            mapping = {
-                '전국':'National','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
-                '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong',
-                '경기':'Gyeonggi','강원':'Gangwon','충북':'Chungbuk','충남':'Chungnam',
-                '전북':'Jeonbuk','전남':'Jeonnam','경북':'Gyeongbuk','경남':'Gyeongnam','제주':'Jeju'
-            }
-            df['region_en'] = df['지역'].map(mapping)
             pivot = df.pivot_table(
                 index='연도', columns='region_en', values='인구'
             ).fillna(0)
+
             colors = sns.color_palette('tab20', n_colors=len(pivot.columns))
             fig, ax = plt.subplots(figsize=(10,6))
             pivot.plot.area(ax=ax, color=colors)
@@ -307,6 +315,7 @@ class EDA:
             ax.set_title("Stacked Area Chart by Region")
             ax.legend(loc='upper left', bbox_to_anchor=(1.0,1.0))
             st.pyplot(fig)
+
 
 # ---------------------
 # 페이지 객체 생성
