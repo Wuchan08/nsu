@@ -209,9 +209,7 @@ class EDA:
             st.info("train.csv 파일을 업로드 해주세요.")
             return
 
-        df = pd.read_csv(uploaded, parse_dates=['연도'])
-        df['연도'] = df['연도'].dt.year  # 연도 정보만 쓰려면 이렇게 다시 뽑아내도 됩니다.
-
+        df = pd.read_csv(uploaded, parse_dates=['datetime'])
 
         tabs = st.tabs([
             "1. 목적 & 절차",
@@ -291,7 +289,6 @@ class EDA:
 
                 # ──────────────────────────────────
                 # 여기부터 “세종” 결측치 교체, 숫자형 변환, info/describe 출력
-                
 
                 # 3. '세종' 지역의 모든 컬럼에서 '-' → 0 치환
                 mask = df['지역'] == '세종'
